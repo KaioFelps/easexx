@@ -1,13 +1,16 @@
 # EaseXX
+
 Cross platform build tool for C++ programs. Avoid riddle makefiles or cmakelists.
+
 ---
 
 This is a pretty simple tool for building C++ and/or running tests. It is not flexible
 as a makefile, but avoid needing to configure everything in order to get a toy program running.
 
 ## Config file
+
+The config file must be named `./build.json` and be placed in your workspace directory.
 ```json
-./build.json
 {
     "outputFileName": "my-program",
     "buildDir": "build",
