@@ -12,18 +12,16 @@ pub fn exec(options: &BuildOptions) -> io::Result<()> {
     maybe_create_dir(&tests_build_dir);
 
     let src_compiled_objects =
-        match super::build::compile_without_linking_from_src_dir(SOURCE_DIR, options)? {
-            Some(objects) => objects,
-            None => {
-                log::warn!("{SOURCE_DIR} directory not found. Skipping to tests directory.");
-                return Ok(());
-            }
-        };
+        super::build::compile_without_linking_from_src_dir(SOURCE_DIR, options)?.map(|objects| {
+            objects
+                .into_iter()
+                .filter(|file| !file.contains("/main."))
+                .collect::<Vec<_>>()
+        });
 
-    let src_compiled_objects = src_compiled_objects
-        .into_iter()
-        .filter(|file| !file.contains("/main."))
-        .collect::<Vec<_>>();
+    if src_compiled_objects.is_none() {
+        log::warn!("{SOURCE_DIR} directory not found. Skipping to tests directory.");
+    }
 
     let tests_dir = std::fs::read_dir(TESTS_DIR)
         .unwrap_or_else(|_| panic!("Could not find {TESTS_DIR} directory"));
@@ -55,7 +53,10 @@ pub fn exec(options: &BuildOptions) -> io::Result<()> {
                 options,
                 output_dir: Some(&tests_build_dir),
                 output_files: &[
-                    src_compiled_objects.as_slice(),
+                    src_compiled_objects
+                        .as_ref()
+                        .unwrap_or(&Vec::with_capacity(0))
+                        .as_slice(),
                     test_resource_files.as_slice(),
                     &[executable_object.to_owned()],
                 ]
