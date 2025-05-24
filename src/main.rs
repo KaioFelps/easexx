@@ -1,12 +1,20 @@
-use std::io;
-
 use build_options::BuildOptions;
+use std::io;
 
 mod build_options;
 mod commands;
 mod common;
 
+pub const SOURCE_DIR: &str = "src";
+pub const TESTS_DIR: &str = "tests";
+
 fn main() -> io::Result<()> {
+    let _ = dotenvy::dotenv();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Warn)
+        .parse_env("RUST_ENV")
+        .init();
+
     let args = std::env::args().collect::<Vec<_>>();
 
     let command = match args.get(1) {
