@@ -2,8 +2,6 @@ use std::io;
 
 use serde::Deserialize;
 
-const CONFIG_FILE_PATH: &str = "build.json";
-
 #[derive(Deserialize)]
 struct PartialBuildOptions {
     pub compiler: String,

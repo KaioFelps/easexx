@@ -7,6 +7,7 @@ mod common;
 
 pub const SOURCE_DIR: &str = "src";
 pub const TESTS_DIR: &str = "tests";
+pub const DEFAULT_CONFIG_FILE: &str = "build.json";
 
 fn main() -> io::Result<()> {
     let _ = dotenvy::dotenv();
