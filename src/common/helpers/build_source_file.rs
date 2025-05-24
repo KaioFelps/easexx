@@ -1,4 +1,4 @@
-use std::{io, path::Path, process::Command};
+use std::process::Command;
 
 use crate::{
     build_options::BuildOptions,
@@ -7,25 +7,31 @@ use crate::{
 
 pub struct BuildSourceFileArgs<'a> {
     pub source_file: &'a str,
-    pub output_dir: Option<&'a str>,
     pub options: &'a BuildOptions,
     pub output_buffer: &'a mut Vec<String>,
+    pub output_file: String,
 }
 
-pub fn build_source_file(
+pub fn build_source_file(mut build_source_file_args: BuildSourceFileArgs) -> anyhow::Result<()> {
+    let mut compile_command = prepare_compile_command(&mut build_source_file_args)?;
+    let mut child = compile_command.spawn()?;
+    let _ = child.wait()?;
+
+    build_source_file_args
+        .output_buffer
+        .push(build_source_file_args.output_file);
+
+    Ok(())
+}
+
+fn prepare_compile_command(
     BuildSourceFileArgs {
         options,
-        output_buffer,
-        output_dir,
         source_file,
-    }: BuildSourceFileArgs<'_>,
-) -> io::Result<()> {
-    let output_file = format!(
-        "{}/{}",
-        output_dir.unwrap_or(options.build_dir.as_str()),
-        get_output_file_from_source_file(source_file)
-    );
-
+        output_file,
+        ..
+    }: &mut BuildSourceFileArgs<'_>,
+) -> anyhow::Result<Command> {
     let mut compiler_vec = options
         .compiler
         .split(" ")
@@ -44,23 +50,37 @@ pub fn build_source_file(
         .arg("-o")
         .arg(&output_file);
 
-    match compile_command.spawn() {
-        Err(err) => return Err(io::Error::new(io::ErrorKind::Other, err)),
-        Ok(mut child) => {
-            let _ = child.wait()?;
-            output_buffer.push(output_file);
-        }
-    }
-
-    Ok(())
+    Ok(compile_command)
 }
 
-fn get_output_file_from_source_file(path: &str) -> String {
-    Path::new(path)
-        .with_extension("o")
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string()
+#[cfg(test)]
+mod test {
+    use rstest::rstest;
+
+    use crate::{
+        build_options::BuildOptions,
+        common::{helpers::build_source_file::prepare_compile_command, BuildSourceFileArgs},
+        test_utils::{fixtures::build_options, helpers::stringify_command},
+    };
+
+    #[rstest]
+    #[test]
+    fn it_should_correctly_prepare_the_compile_command(build_options: BuildOptions) {
+        let mut output_buffer = Vec::new();
+
+        let compile_command = prepare_compile_command(&mut BuildSourceFileArgs {
+            options: &build_options,
+            output_buffer: &mut output_buffer,
+            output_file: "foo.o".into(),
+            source_file: "foo.cpp",
+        })
+        .unwrap();
+
+        let compile_command = stringify_command(&compile_command);
+
+        assert_eq!(
+            "zig c++ -std=c++20 -Iinclude -c foo.cpp -o foo.o",
+            compile_command
+        );
+    }
 }
