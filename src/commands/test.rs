@@ -2,7 +2,7 @@ use crate::common::{
     build_source_file, discover_cpp_files, link_all_objects, maybe_create_dir, BuildSourceFileArgs,
     LinkAllObjectsArgs,
 };
-use crate::BuildOptions;
+use crate::{BuildOptions, SOURCE_DIR, TESTS_DIR};
 use std::io;
 use std::path::Path;
 use std::process::Command;
@@ -11,13 +11,22 @@ pub fn exec(options: &BuildOptions) -> io::Result<()> {
     let tests_build_dir = format!("{}/__tests__", &options.build_dir);
     maybe_create_dir(&tests_build_dir);
 
-    let src_compiled_objects = super::build::compile_without_linking_from_src_dir(options)?
+    let src_compiled_objects =
+        match super::build::compile_without_linking_from_src_dir(SOURCE_DIR, options)? {
+            Some(objects) => objects,
+            None => {
+                log::warn!("{SOURCE_DIR} directory not found. Skipping to tests directory.");
+                return Ok(());
+            }
+        };
+
+    let src_compiled_objects = src_compiled_objects
         .into_iter()
         .filter(|file| !file.contains("/main."))
         .collect::<Vec<_>>();
 
-    let tests_dir: &str = "tests";
-    let tests_dir = std::fs::read_dir(tests_dir).expect("Could not find src directory");
+    let tests_dir = std::fs::read_dir(TESTS_DIR)
+        .unwrap_or_else(|_| panic!("Could not find {TESTS_DIR} directory"));
 
     let mut source_files = Vec::new();
     tests_dir.for_each(|entry| discover_cpp_files(entry, &mut source_files));

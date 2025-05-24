@@ -2,11 +2,17 @@ use crate::common::{
     build_source_file, discover_cpp_files, link_all_objects, maybe_create_dir, BuildSourceFileArgs,
     LinkAllObjectsArgs,
 };
-use crate::BuildOptions;
+use crate::{BuildOptions, SOURCE_DIR};
 use std::io;
 
 pub fn exec(options: &BuildOptions) -> io::Result<()> {
-    let compiled_objects = compile_without_linking_from_src_dir(options)?;
+    let compiled_objects = match compile_without_linking_from_src_dir(SOURCE_DIR, options)? {
+        Some(objects) => objects,
+        None => {
+            log::warn!("{SOURCE_DIR} directory not found. Skipping build command.");
+            return Ok(());
+        }
+    };
 
     let executable_file_name = link_all_objects(LinkAllObjectsArgs {
         options,
@@ -22,11 +28,16 @@ pub fn exec(options: &BuildOptions) -> io::Result<()> {
 }
 
 pub(super) fn compile_without_linking_from_src_dir(
+    src_dir: &str,
     options: &BuildOptions,
-) -> io::Result<Vec<String>> {
+) -> io::Result<Option<Vec<String>>> {
     maybe_create_dir(&options.build_dir);
 
-    let src_dir: &str = "src";
+    let exists = std::fs::exists(src_dir);
+    if !exists.is_ok_and(|res| res) {
+        return Ok(None);
+    }
+
     let src_dir =
         std::fs::read_dir(src_dir).unwrap_or_else(|_| panic!("Could not find {src_dir} directory"));
 
@@ -44,5 +55,5 @@ pub(super) fn compile_without_linking_from_src_dir(
         })?;
     }
 
-    Ok(compiled_objects)
+    Ok(Some(compiled_objects))
 }
