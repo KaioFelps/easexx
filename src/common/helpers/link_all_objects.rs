@@ -1,9 +1,9 @@
-use std::process::Command;
-
-use crate::{
-    build_options::BuildOptions,
-    common::{to_flag_vector, CompilerFlag},
+use super::resolve_output_file::{
+    resolve_output_file_path, OutputFileExtension, ResolveOutputFileArgs,
 };
+use crate::build_options::BuildOptions;
+use crate::common::{to_flag_vector, CompilerFlag};
+use std::process::Command;
 
 pub struct LinkAllObjectsArgs<'a> {
     pub output_files: &'a Vec<String>,
@@ -13,31 +13,60 @@ pub struct LinkAllObjectsArgs<'a> {
     pub output_filename: Option<&'a str>,
 }
 
-pub fn link_all_objects(
+pub fn link_all_objects(link_all_objects_args: LinkAllObjectsArgs<'_>) -> String {
+    let (output_dir, output_filename) = resolve_output_dir_and_filename(&link_all_objects_args);
+    let executable = get_executable(output_dir, output_filename);
+
+    let mut link_command = prepare_obj_linkage_command(link_all_objects_args, &executable);
+
+    match link_command.spawn() {
+        Err(err) => {
+            panic!("Failed to link compiled binaries into executable. {err}")
+        }
+        Ok(mut child) => {
+            let _ = child.wait();
+            executable
+        }
+    }
+}
+
+fn resolve_output_dir_and_filename<'a>(
+    link_all_objects_args: &'a LinkAllObjectsArgs<'a>,
+) -> (&'a str, &'a str) {
+    (
+        link_all_objects_args
+            .output_dir
+            .unwrap_or(&link_all_objects_args.options.build_dir),
+        link_all_objects_args
+            .output_filename
+            .unwrap_or(&link_all_objects_args.options.output_filename),
+    )
+}
+
+fn get_executable(output_dir: &str, source_file: &str) -> String {
+    #[cfg(not(windows))]
+    let extension = OutputFileExtension::UnixExecutable;
+    #[cfg(windows)]
+    let extension = OutputFileExtension::WindowsExecutable;
+
+    resolve_output_file_path(ResolveOutputFileArgs {
+        extension,
+        output_dir,
+        source_file,
+    })
+}
+
+fn prepare_obj_linkage_command(
     LinkAllObjectsArgs {
         options,
-        output_dir,
         output_files,
         include_dev_libs,
-        output_filename,
+        ..
     }: LinkAllObjectsArgs<'_>,
-) -> String {
+    executable: &str,
+) -> Command {
     let mut compiler_command_args = options.compiler.split(" ").collect::<Vec<_>>();
     let compiler_program = compiler_command_args.remove(0);
-
-    #[allow(unused_mut)]
-    let mut executable = output_filename
-        .unwrap_or(options.output_file_name.as_str())
-        .to_string();
-
-    #[cfg(windows)]
-    executable.push_str(".exe");
-
-    let executable = format!(
-        "{}/{}",
-        output_dir.unwrap_or(options.build_dir.as_str()),
-        executable
-    );
 
     let mut link_command = Command::new(compiler_program);
     link_command
@@ -57,15 +86,41 @@ pub fn link_all_objects(
         link_command.args(to_flag_vector(&options.dev_libs, CompilerFlag::Lib));
     }
 
-    link_command.arg("-o").arg(&executable);
+    link_command.arg("-o").arg(executable);
 
-    match link_command.spawn() {
-        Err(err) => {
-            panic!("Failed to link compiled binaries into executable. {err}")
-        }
-        Ok(mut child) => {
-            let _ = child.wait();
-            executable
-        }
+    link_command
+}
+
+#[cfg(test)]
+mod test {
+    use rstest::rstest;
+
+    use crate::{
+        build_options::BuildOptions,
+        test_utils::{fixtures::build_options, helpers::stringify_command},
+    };
+
+    use super::{prepare_obj_linkage_command, LinkAllObjectsArgs};
+
+    #[rstest]
+    #[test]
+    fn should_correctly_format_the_compiler_command(build_options: BuildOptions) {
+        let command = prepare_obj_linkage_command(
+            LinkAllObjectsArgs {
+                include_dev_libs: true,
+                options: &build_options,
+                output_dir: None,
+                output_filename: None,
+                output_files: &vec!["foo.o".into()],
+            },
+            "foo",
+        );
+
+        let command_as_str = stringify_command(&command);
+
+        assert_eq!(
+            "zig c++ -std=c++20 -Iinclude -Lbin/libs foo.o -lCatch2 -o foo",
+            command_as_str
+        );
     }
 }
