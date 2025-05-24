@@ -1,0 +1,11 @@
+{
+    "outputFileName": "foo-bar",
+    "buildDir": "build",
+    "compiler": "zig c++",
+    "compilerFlags": ["-std=c++20"],
+    "includeDirs": ["include"],
+    "libDirs": [],
+    "libs": [],
+    "devLibDirs": ["bin/libs"],
+    "devLibs": ["Catch2"]
+}
