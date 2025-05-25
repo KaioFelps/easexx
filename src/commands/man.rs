@@ -1,23 +1,63 @@
-use std::{io, sync::OnceLock};
+struct ManualCommandFlag<'a> {
+    aliases: Vec<&'a str>,
+    description: &'a str,
+    example: &'a str,
+}
 
-static AVAILABLE_COMMANDS: OnceLock<Vec<[&str; 2]>> = OnceLock::new();
+struct ManualCommand<'a> {
+    command: &'a str,
+    description: &'a str,
+    flags: Vec<ManualCommandFlag<'a>>,
+}
 
-pub fn exec() -> io::Result<()> {
-    let commands = AVAILABLE_COMMANDS.get_or_init(|| {
-        vec![[
-            "build",
-            "Build the current application using data from `./build.json`.",
-        ], [
-            "test",
-            "Build the whole application and files from `tests` directory and execute each \"*_test.cpp\" file."
-        ]]
-    });
+pub fn exec() -> anyhow::Result<()> {
+    let commands: Vec<ManualCommand> = vec![
+            ManualCommand {
+                command: "build",
+                description: "Build the current application using data from `./build.json`.",
+                flags: vec![
+                    ManualCommandFlag {
+                        aliases: vec!["-p"],
+                        description: "Tells the path to the `build.json` file.",
+                        example: "./easexx build -p=path/to/build.json"
+                    }
+                ]
+            },
+            ManualCommand {
+                command: "test",
+                description: "Build the whole application and files from `tests` directory and execute each \"*_test.cpp\" file.",
+                flags: vec![]
+            }
+        ];
 
     println!("This is the cli tool for building this C++ application.");
     println!("Available commands are:");
 
-    for [command, title] in commands {
-        println!("{command:10}\t{title}");
+    for ManualCommand {
+        command,
+        description,
+        flags,
+    } in commands
+    {
+        println!("\"{command}\": {description}");
+
+        if !flags.is_empty() {
+            println!("    Flags:");
+        }
+
+        for ManualCommandFlag {
+            aliases,
+            description,
+            example,
+        } in flags
+        {
+            println!(
+                "        Aliases: {}\n        \
+                {description}\n        \
+                Example: {example}\n",
+                aliases.join(", ")
+            );
+        }
     }
 
     Ok(())
