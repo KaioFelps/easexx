@@ -1,4 +1,4 @@
-use std::io;
+use std::fs::File;
 
 use serde::Deserialize;
 
@@ -25,7 +25,7 @@ struct PartialBuildOptions {
     pub build_dir: Option<String>,
 
     #[serde(rename = "outputFileName")]
-    pub output_file_name: String,
+    pub output_filename: String,
 }
 
 pub struct BuildOptions {
@@ -37,15 +37,15 @@ pub struct BuildOptions {
     pub dev_lib_dirs: Vec<String>,
     pub dev_libs: Vec<String>,
     pub build_dir: String,
-    pub output_file_name: String,
+    pub output_filename: String,
     pub release: bool,
 }
 
 impl BuildOptions {
-    pub fn read_from_config_file() -> io::Result<Self> {
-        let file = std::fs::File::open(CONFIG_FILE_PATH)?;
-        let options: PartialBuildOptions = serde_json::from_reader(file)
-            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+    pub fn read_from_config_file(file: File) -> anyhow::Result<Self> {
+        let options: PartialBuildOptions = serde_json::from_reader(file).map_err(|err| {
+            anyhow::Error::msg(format!("Failed to parse build config file: {err}"))
+        })?;
 
         Ok(options.into())
     }
@@ -62,7 +62,7 @@ impl From<PartialBuildOptions> for BuildOptions {
             include_dirs: value.include_dirs.unwrap_or_default(),
             lib_dirs: value.lib_dirs.unwrap_or_default(),
             libs: value.libs.unwrap_or_default(),
-            output_file_name: value.output_file_name,
+            output_filename: value.output_filename,
             release: std::env::args().any(|arg| arg == "--release"),
         }
     }
