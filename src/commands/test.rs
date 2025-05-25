@@ -1,13 +1,16 @@
+use crate::common::helpers::resolve_output_file::{
+    resolve_output_file_path, OutputFileExtension, ResolveOutputFileArgs,
+};
+use crate::common::helpers::should_recompile::{should_recompile, ShouldRecompileArgs};
 use crate::common::{
     build_source_file, discover_cpp_files, link_all_objects, maybe_create_dir, BuildSourceFileArgs,
     LinkAllObjectsArgs,
 };
 use crate::{BuildOptions, SOURCE_DIR, TESTS_DIR};
-use std::io;
 use std::path::Path;
 use std::process::Command;
 
-pub fn exec(options: &BuildOptions) -> io::Result<()> {
+pub fn exec(options: &BuildOptions) -> anyhow::Result<()> {
     let tests_build_dir = format!("{}/__tests__", &options.build_dir);
     maybe_create_dir(&tests_build_dir);
 
@@ -32,11 +35,26 @@ pub fn exec(options: &BuildOptions) -> io::Result<()> {
     let mut compiled_objects = Vec::new();
 
     for ref source_file in source_files {
+        let output_dir = &tests_build_dir;
+
+        let output_file = resolve_output_file_path(ResolveOutputFileArgs {
+            output_dir,
+            source_file,
+            extension: OutputFileExtension::Object,
+        });
+
+        if !should_recompile(ShouldRecompileArgs {
+            src_filename: source_file,
+            object_filename: &output_file,
+        }) {
+            continue;
+        }
+
         build_source_file(BuildSourceFileArgs {
             options,
             output_buffer: &mut compiled_objects,
             source_file,
-            output_dir: Some(&tests_build_dir),
+            output_file,
         })?;
     }
 
