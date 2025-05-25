@@ -26,18 +26,14 @@ pub fn should_recompile(
         Ok(time) => time,
     };
 
-    let obj_file_created_time = match get_created_time(&object_file) {
+    let obj_file_modified_time = match get_modified_time(&object_file) {
         Err(_) => return true,
         Ok(time) => time,
     };
 
-    file_modified_time > obj_file_created_time
+    file_modified_time > obj_file_modified_time
 }
 
 fn get_modified_time(file: &File) -> Result<SystemTime, Error> {
     file.metadata()?.modified()
-}
-
-fn get_created_time(file: &File) -> Result<SystemTime, Error> {
-    file.metadata()?.created()
 }
