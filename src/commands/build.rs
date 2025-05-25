@@ -60,6 +60,7 @@ pub(super) fn compile_without_linking_from_src_dir(
             object_filename: &output_file,
             src_filename: source_file,
         }) {
+            compiled_objects.push(source_file.to_string());
             continue;
         }
 

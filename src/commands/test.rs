@@ -47,6 +47,7 @@ pub fn exec(options: &BuildOptions) -> anyhow::Result<()> {
             src_filename: source_file,
             object_filename: &output_file,
         }) {
+            compiled_objects.push(output_file);
             continue;
         }
 
@@ -60,7 +61,7 @@ pub fn exec(options: &BuildOptions) -> anyhow::Result<()> {
 
     let (test_executable_files, test_resource_files): (Vec<String>, Vec<String>) = compiled_objects
         .into_iter()
-        .partition(|file| file.contains("_test."));
+        .partition(|obj| is_a_test_executable(obj));
 
     let tests_executables = test_executable_files
         .iter()
@@ -92,16 +93,19 @@ pub fn exec(options: &BuildOptions) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn is_a_test_executable(file_path: &str) -> bool {
+    file_path.contains("_test.")
+}
+
 fn run_executable(executable: &String) {
     let _ = Command::new(executable).status();
 }
 
 fn get_filename_without_extension(path: &str) -> String {
     Path::new(path)
+        .with_extension("")
         .file_name()
         .unwrap()
         .to_string_lossy()
-        .strip_suffix(".o")
-        .unwrap()
         .to_string()
 }
