@@ -1,38 +1,47 @@
 use build_options::BuildOptions;
-use std::io;
+use commands::EasexxCommand;
+use utils::{get_build_options, get_command_from_args, GetBuildOptionsArgs};
 
 mod build_options;
 mod commands;
 mod common;
+mod utils;
+
+#[cfg(test)]
+mod test_utils;
 
 pub const SOURCE_DIR: &str = "src";
 pub const TESTS_DIR: &str = "tests";
 pub const DEFAULT_CONFIG_FILE: &str = "build.json";
 
-fn main() -> io::Result<()> {
+fn main() {
     let _ = dotenvy::dotenv();
     env_logger::builder()
         .filter_level(log::LevelFilter::Warn)
+        .format_file(false)
+        .format_timestamp(None)
         .parse_env("RUST_ENV")
         .init();
 
     let args = std::env::args().collect::<Vec<_>>();
 
-    let command = match args.get(1) {
-        Some(command) => command,
-        None => {
-            return commands::man::exec();
+    let command = get_command_from_args();
+
+    let options = match get_build_options(GetBuildOptionsArgs {
+        args: &args,
+        default_config_file_path: DEFAULT_CONFIG_FILE,
+    }) {
+        Ok(opts) => opts,
+        Err(err) => {
+            return log::error!("{err}");
         }
     };
 
-    let options = BuildOptions::read_from_config_file()?;
-
-    match command.as_str() {
-        "build" => commands::build::exec(&options),
-        "test" => commands::test::exec(&options),
-        _ => {
-            println!("Comando {command} não encontrado.");
-            commands::man::exec()
-        }
+    if let Err(err) = match command {
+        EasexxCommand::Build => commands::build::exec(&options),
+        EasexxCommand::Test => commands::test::exec(&options),
+        EasexxCommand::Man => commands::man::exec(),
+    } {
+        log::error!("{err}");
     }
 }
